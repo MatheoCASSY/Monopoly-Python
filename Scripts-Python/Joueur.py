@@ -106,7 +106,6 @@ class Joueur:
                 # Libérer la propriété (remise à la banque)
                 propriete.proprietaire = None
                 propriete.nb_maisons = 0
-                propriete.a_hotel = False
                 propriete.hypothequee = False
         
         self.proprietes.clear()
@@ -118,9 +117,8 @@ class Joueur:
         for prop in self.proprietes:
             valeur += prop.prix
             if isinstance(prop, Propriete) and not isinstance(prop, (Gare, Compagnie)):
-                valeur += prop.nb_maisons * prop.prix_maison
-                if prop.a_hotel:
-                    valeur += prop.prix_maison
+                # Valeur de revente des bâtiments = moitié du prix d'achat
+                valeur += (prop.nb_maisons * prop.prix_maison) // 2
         return valeur
     
     def __str__(self):

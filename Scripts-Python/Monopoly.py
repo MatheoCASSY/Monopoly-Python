@@ -171,7 +171,8 @@ class Monopoly:
             for prop in proprietes:
                 if prop.peut_construire(joueur):
                     # Construire si assez d'argent (garder une réserve)
-                    if not prop.a_hotel and joueur.argent >= prop.prix_maison * 2:
+                    # Hôtel est maintenant représenté par nb_maisons == 5
+                    if prop.nb_maisons != 5 and joueur.argent >= prop.prix_maison * 2:
                         if prop.nb_maisons < 4:
                             if prop.construire_maison(joueur):
                                 if not self.mode_debug:
@@ -257,7 +258,7 @@ class Monopoly:
                 for prop in gagnant.proprietes:
                     info = f"   • {prop.nom}"
                     if isinstance(prop, Propriete) and not isinstance(prop, (Gare, Compagnie)):
-                        if prop.a_hotel:
+                        if prop.nb_maisons == 5:
                             info += " [HÔTEL]"
                         elif prop.nb_maisons > 0:
                             info += f" [{prop.nb_maisons}]"

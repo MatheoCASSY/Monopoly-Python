@@ -14,8 +14,8 @@ class Propriete(Case):
         self.loyer_base = loyer
         self.couleur = couleur
         self.proprietaire: Optional['Joueur'] = None # type: ignore
+        # nb_maisons: 0-4 = maisons, 5 = hôtel
         self.nb_maisons = 0
-        self.a_hotel = False
         self.prix_maison = prix_maison
         self.hypothequee = False
     
@@ -24,9 +24,10 @@ class Propriete(Case):
         if self.hypothequee or not self.proprietaire:
             return 0
         
-        if self.a_hotel:
+        # Hôtel = 5e maison
+        if self.nb_maisons == 5:
             return self.loyer_base * 100
-        elif self.nb_maisons > 0:
+        elif 1 <= self.nb_maisons <= 4:
             # Multiplicateurs: 1 maison=×5, 2=×15, 3=×45, 4=×80
             multiplicateurs = [5, 15, 45, 80]
             return self.loyer_base * multiplicateurs[self.nb_maisons - 1]
@@ -54,7 +55,8 @@ class Propriete(Case):
         if self.hypothequee:
             return False
         
-        if self.a_hotel:
+        # si déjà hôtel (5 maisons) -> pas possible
+        if self.nb_maisons == 5:
             return False
         
         nbMaisonsMin = min([p.nb_maisons for p in joueur.proprietes])
@@ -69,7 +71,8 @@ class Propriete(Case):
         if not self.peut_construire(joueur):
             return False
         
-        if self.nb_maisons >= 4:
+        # Autorisé jusqu'à 5 (5 représente l'hôtel)
+        if self.nb_maisons >= 5:
             return False
         
         if joueur.argent < self.prix_maison:
@@ -83,16 +86,15 @@ class Propriete(Case):
         """Construit un hôtel (nécessite 4 maisons)"""
         if not self.peut_construire(joueur):
             return False
-        
         if self.nb_maisons != 4:
             return False
-        
-        if joueur.argent < self.prix_maison:
+
+        if joueur.argent < self.prix_maison * 5:
             return False
-        
-        joueur.payer(self.prix_maison)
-        self.nb_maisons = 0
-        self.a_hotel = True
+
+        # Construire l'hôtel comme la 5ème maison — coût = 5 × prix_maison
+        joueur.payer(self.prix_maison * 5)
+        self.nb_maisons = 5
         return True
    
     def action(self, joueur: 'Joueur', jeu: 'Monopoly'):
@@ -122,8 +124,8 @@ class Propriete(Case):
         info = f"{self.nom} ({self.couleur})"
         if self.proprietaire:
             info += f" - {self.proprietaire.nom}"
-            if self.a_hotel:
-                info += " []"
+            if self.nb_maisons == 5:
+                info += " [HÔTEL]"
             elif self.nb_maisons > 0:
                 info += f" [{self.nb_maisons}]"
         return info

@@ -182,7 +182,8 @@ class PaquetCartes:
         total = 0
         for prop in joueur.proprietes:
             if isinstance(prop, Propriete) and not isinstance(prop, (Gare, Compagnie)):
-                if prop.a_hotel:
+                # Hôtel = 5e maison
+                if prop.nb_maisons == 5:
                     total += prix_hotel
                 else:
                     total += prop.nb_maisons * prix_maison

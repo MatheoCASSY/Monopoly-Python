@@ -35,7 +35,7 @@ Si cette commande affiche `Import OK`, l'environnement Python peut charger le mo
 - `Monopoly` : orchestrateur du jeu, gère les tours et stocke `dernier_total_des` (utile pour les compagnies).
 - `Joueur` : solde, propriétés, méthodes de construction (maisons/hôtels).
 - `Case` (abstraite) → `Propriete`, `Gare`, `Compagnie`, `CaseSpeciale`.
-- `Propriete` : attributs `nb_maisons`, `a_hotel`, méthode `calculer_loyer()`.
+- `Propriete` : attribut `nb_maisons` (0-4 = maisons, 5 = hôtel), méthode `calculer_loyer()`.
 - `Gare` : loyer selon le nombre de gares possédées.
 - `Compagnie` : loyer calculé depuis la somme des dés (capturée dans `Monopoly.dernier_total_des`).
 
@@ -76,7 +76,7 @@ Remarque : `Monopoly.dernier_total_des` doit être mis à jour après chaque lan
 - `Joueur.possede_quartier_complet(couleur) -> bool` : vérifie possession complète d'un quartier.
 - `Joueur.peut_construire_maison(propriete) -> bool` : vérifie propriétaire, pas d'hôtel, <4 maisons, quartier complet, argent.
 - `Joueur.construire_maison(propriete)` : coût = `propriete.prix // 2` ; incrémente `nb_maisons`.
-- `Joueur.construire_hotel(propriete)` : nécessite 4 maisons ; coût = `5 × prix_maison` ; met `a_hotel = True` et `nb_maisons = 0`.
+- `Joueur.construire_hotel(propriete)` : nécessite 4 maisons ; coût = `5 × prix_maison` ; convertit la 4ème maison en hôtel (représenté par `nb_maisons = 5`).
 
 ---
 
@@ -87,7 +87,7 @@ le code :
 
 - `proprietes`(id, nom, position, prix, loyer, couleur, type)
 - `joueurs`(id, nom, argent, position)
-- `joueurs_proprietes`(joueur_id, propriete_id, nb_maisons, a_hotel)
+- `joueurs_proprietes`(joueur_id, propriete_id, nb_maisons)  -- `nb_maisons = 5` signifie hôtel
 
 Adapter la configuration MySQL dans `src/db.py` si vous voulez connecter une base réelle.
 

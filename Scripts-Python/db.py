@@ -10,10 +10,10 @@ class DB:
     @classmethod
     def connexionBase(cls):
         mydb = mysql.connector.connect(
-          host="localhost",
-          user="monopoly_user",
-          password="Azerty$",
-          database = "monopoly"
+            host="localhost",
+            user="monopoly_user",
+            password="root",
+            database = "monopoly"
         )
         return mydb
 
