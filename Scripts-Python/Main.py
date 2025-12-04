@@ -16,6 +16,7 @@ from IAAgressive import IAAgressive
 from IAStrategique import IAStrategique
 from IAConservative import IAConservative
 from Statistiques import StatistiquesPartie
+import random
 
 
 def _read_int(prompt: str, min_val: int | None = None, max_val: int | None = None) -> int:
@@ -63,7 +64,21 @@ def simuler_parties(nb_parties: int, nb_joueurs: int, strategie: StrategieIA = N
     print(f"SIMULATION DE {nb_parties} PARTIES")
     print(f"{'='*60}")
     
-    strategie = strategie or IAAgressive()
+    # Determine strategies for players once at creation time.
+    # If `strategie` is None -> randomize strategies per player (once) from the pool.
+    # If `strategie` is a single StrategieIA -> use it for all players.
+    # If `strategie` is a list -> normalize length and use per-player strategies.
+    pool = [IAAgressive, IAConservative, IAStrategique]
+    if strategie is None:
+        strategies_for_players = [random.choice(pool)() for _ in range(nb_joueurs)]
+    elif isinstance(strategie, list):
+        # normalize list length
+        if len(strategie) < nb_joueurs:
+            strategie = strategie + [strategie[-1]] * (nb_joueurs - len(strategie))
+        strategies_for_players = strategie[:nb_joueurs]
+    else:
+        strategies_for_players = [strategie for _ in range(nb_joueurs)]
+
     resultats = {f"Joueur {i+1}": 0 for i in range(nb_joueurs)}
     durees = []
     toutes_stats = []
@@ -71,40 +86,62 @@ def simuler_parties(nb_parties: int, nb_joueurs: int, strategie: StrategieIA = N
     for i in range(nb_parties):
         if (i + 1) % 10 == 0 or i == 0:
             print(f"Progression: {i+1}/{nb_parties}", end='\r')
-        
-        noms = [f"Joueur {j+1} ({strategie.nom})" for j in range(nb_joueurs)]
-        jeu = Monopoly(noms, strategie)
+        # Use the same strategies_for_players for every simulated game
+        noms = [f"Joueur {j+1} ({strategies_for_players[j].nom})" for j in range(nb_joueurs)]
+        jeu = Monopoly(noms, strategies_for_players)
         jeu.mode_debug = True
         
         gagnant = jeu.jouer_partie(max_tours=200)
-        
+        # increment results by player index so aggregation is stable
         if gagnant:
-            resultats[gagnant.nom] += 1
+            for idx, joueur in enumerate(jeu.joueurs):
+                if joueur is gagnant or joueur.nom == gagnant.nom:
+                    resultats[f"Joueur {idx+1}"] += 1
+                    break
         durees.append(jeu.stats.nb_tours)
         toutes_stats.append(jeu.stats)
     
     print()  # Nouvelle ligne après la progression
     
-    # Afficher les résultats
-    _afficher_resultats_simulation(resultats, durees, toutes_stats, strategie, nb_parties)
+    # Afficher les résultats; pass the strategies list so the report shows which
+    # strategy each player used across all simulated games.
+    _afficher_resultats_simulation(resultats, durees, toutes_stats, strategies_for_players, nb_parties)
 
 
 def _afficher_resultats_simulation(resultats: dict, durees: List[int], 
                                    toutes_stats: List[StatistiquesPartie],
-                                   strategie: StrategieIA, nb_parties: int):
+                                   strategies: List[StrategieIA], nb_parties: int):
     """Affiche l'analyse des résultats de simulation"""
     print(f"\n{'='*60}")
     print("ANALYSE DES RÉSULTATS")
     print(f"{'='*60}")
-    print(f"Stratégie: {strategie.nom}")
+    # If all players used the same strategy, report it simply; otherwise print
+    # the per-player mapping used for the simulations.
+    try:
+        noms_strats = [s.nom for s in strategies]
+        unique = set(noms_strats)
+        if len(unique) == 1:
+            print(f"Stratégie: {noms_strats[0]}")
+        else:
+            mapping = ", ".join(f"Joueur {i+1} -> {noms_strats[i]}" for i in range(len(noms_strats)))
+            print(f"Stratégies par joueur: {mapping}")
+    except Exception:
+        print("Stratégies: inconnues")
     print(f"Parties jouées: {nb_parties}")
     
     # Taux de victoire
     print(f"\nTaux de victoire:")
     for nom, victoires in sorted(resultats.items(), key=lambda x: x[1], reverse=True):
+        # Attach strategy label to player when printing
+        try:
+            idx = int(nom.split()[1]) - 1
+            strat_label = strategies[idx].nom
+            label = f"{nom} ({strat_label})"
+        except Exception:
+            label = nom
         pourcentage = (victoires / nb_parties) * 100
         barre = "█" * int(pourcentage / 2)
-        print(f"  {nom:12}: {victoires:3}/{nb_parties} ({pourcentage:5.1f}%) {barre}")
+        print(f"  {label:32}: {victoires:3}/{nb_parties} ({pourcentage:5.1f}%) {barre}")
     
     # Durée des parties
     print(f"\nDurée des parties:")
@@ -292,7 +329,8 @@ def main():
         print("\n" + "="*60)
         nb_parties = _read_int("Nombre de parties à simuler: ", min_val=1)
         nb_joueurs = _read_int("Nombre de joueurs par partie (2-4): ", min_val=2, max_val=4)
-        simuler_parties(nb_parties, nb_joueurs, IAStrategique())
+        # default: randomize strategies per player per game
+        simuler_parties(nb_parties, nb_joueurs, None)
     
     elif choix == 4:
         print("\n" + "="*60)

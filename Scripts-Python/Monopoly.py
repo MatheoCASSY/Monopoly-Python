@@ -327,9 +327,20 @@ class Monopoly:
         self._afficher_resultat_final()
         
         self.stats.nb_tours = self.tour_numero
+        # Determine winner. If a single player remains, obtenir_gagnant() returns them.
+        # If the max turn limit was reached and nobody is bankrupt, decide a winner
+        # by who has the most cash, then the most properties, then highest total value.
         gagnant = self.obtenir_gagnant()
+
+        if gagnant is None and self.tour_numero >= max_tours:
+            joueurs_actifs = [j for j in self.joueurs if not j.est_en_faillite]
+            if joueurs_actifs:
+                # Sort by (argent, nombre de propriétés, valeur totale)
+                joueurs_actifs.sort(key=lambda j: (j.argent, len(j.proprietes), j.calculer_valeur_totale()), reverse=True)
+                gagnant = joueurs_actifs[0]
+
         self.stats.gagnant = gagnant
-        
+
         return gagnant
     
     def _afficher_resultat_final(self):
