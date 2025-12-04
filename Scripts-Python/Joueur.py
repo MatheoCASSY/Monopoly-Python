@@ -4,6 +4,9 @@ Durée: 16h sur 4 séances de 4h
 """
 from Global import *
 from typing import List, Optional
+from Propriete import Propriete
+from Gare import Gare
+from Compagnie import Compagnie
 
 class Joueur:
     """Représente un joueur de Monopoly"""

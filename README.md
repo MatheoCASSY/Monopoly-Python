@@ -36,6 +36,8 @@ Si cette commande affiche `Import OK`, l'environnement Python peut charger le mo
 - `Joueur` : solde, propriétés, méthodes de construction (maisons/hôtels).
 - `Case` (abstraite) → `Propriete`, `Gare`, `Compagnie`, `CaseSpeciale`.
 - `Propriete` : attribut `nb_maisons` (0-4 = maisons, 5 = hôtel), méthode `calculer_loyer()`.
+ - `Propriete` : attribut `nb_maisons` (0-4 = maisons, 5 = hôtel), méthode `calculer_loyer()`.
+ - `Quartier` : nouvelle abstraction rassemblant les propriétés d'une même couleur; expose `possederQuartier(joueur)`.
 - `Gare` : loyer selon le nombre de gares possédées.
 - `Compagnie` : loyer calculé depuis la somme des dés (capturée dans `Monopoly.dernier_total_des`).
 
@@ -54,6 +56,14 @@ Le plateau contient 40 cases; chaque case définit une action exécutée lorsqu'
 - 3 maisons : `loyer_base × 2.6`.
 - 4 maisons : `loyer_base × 3.5`.
 - Hôtel : `loyer_base × 32`.
+ - Hôtel : calcul spécial (implémentation actuelle retourne `loyer_base × 100`).
+
+Remarque importante sur la représentation de l'hôtel
+- L'hôtel est représenté dans le code comme la 5ᵉ maison : `nb_maisons == 5`.
+- Construire un hôtel coûte `5 × prix_maison` (coût de construction payé lors de la conversion des 4 maisons).
+- La valeur de revente des bâtiments (maisons + hôtel) est calculée comme `0.5 × (nb_maisons × prix_maison)` —
+  autrement dit un hôtel compte pour 5 unités de `prix_maison` lors du calcul de la valeur, et la revente
+  rapporte la moitié de ce montant.
 
 ### Gares
 
@@ -132,24 +142,26 @@ Vous pouvez aussi ouvrir `db/monopoly_db.sql` dans MySQL Workbench et exécuter 
 
 Configuration de la connexion
 
-La connexion est définie dans `Scripts-Python/db.py` (fonction `DB.connexionBase()`), par défaut :
+La connexion à la base est gérée dans `Scripts-Python/db.py` (méthode `DB.connexionBase()`). Par
+défaut le projet contient une configuration simple, mais il est fortement recommandé d'utiliser des
+variables d'environnement pour paramétrer l'accès à la base. Exemple d'approche (pseudo-code) :
 
 ```python
-mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="",
-    database="monopoly"
-)
+import os
+host = os.getenv('MONOPOLY_DB_HOST', 'localhost')
+user = os.getenv('MONOPOLY_DB_USER', 'monopoly_user')
+password = os.getenv('MONOPOLY_DB_PASSWORD', '')
+database = os.getenv('MONOPOLY_DB_NAME', 'monopoly')
+
+mysql.connector.connect(host=host, user=user, password=password, database=database)
 ```
 
-Pour un usage plus sûr, remplacez cette configuration par la lecture de variables d'environnement
-ou d'un fichier de configuration. Exemples de variables à définir :
+Variables d'environnement suggérées : `MONOPOLY_DB_HOST`, `MONOPOLY_DB_USER`, `MONOPOLY_DB_PASSWORD`,
+`MONOPOLY_DB_NAME`.
 
-- MONOPOLY_DB_HOST
-- MONOPOLY_DB_USER
-- MONOPOLY_DB_PASSWORD
-- MONOPOLY_DB_NAME
+Note sur le schéma: la table associant joueurs et propriétés (`joueurs_proprietes`) contient désormais
+seulement la colonne `nb_maisons` pour représenter les constructions. `nb_maisons = 5` signifie qu'il y a
+un hôtel — il n'y a plus de colonne séparée `a_hotel`.
 
 ## Lancer le projet
 
