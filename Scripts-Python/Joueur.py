@@ -20,6 +20,9 @@ class Joueur:
         self.cartes_liberte = 0
         self.est_en_faillite = False
         self.doubles_consecutifs = 0
+        # Compteurs de constructions réalisées par ce joueur
+        self.maisons_construites = 0
+        self.hotels_construits = 0
     
     def deplacer(self, nombre_cases: int, plateau_taille: int = 40):
         """Déplace le joueur sur le plateau"""

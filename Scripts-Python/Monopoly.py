@@ -6,6 +6,8 @@ Durée: 16h sur 4 séances de 4h
 from Global import *
 from Statistiques import StatistiquesPartie
 from IAAgressive import IAAgressive
+from IAStrategique import IAStrategique
+from StrategieIA import StrategieIA
 
 from Plateau import Plateau
 from Joueur import Joueur
@@ -19,7 +21,7 @@ from typing import List, Optional
 
 class Monopoly:
     """Classe principale qui gère une partie de Monopoly"""
-    def __init__(self, noms_joueurs: List[str], strategie: 'StrategieIA' = None):
+    def __init__(self, noms_joueurs: List[str], strategie: 'StrategieIA' | List['StrategieIA'] = None):
         self.plateau = Plateau()
         self.joueurs = [Joueur(nom) for nom in noms_joueurs]
         self.joueur_actuel_index = 0
@@ -27,7 +29,22 @@ class Monopoly:
         self.cartes_communaute = PaquetCartes("communaute")
         self.tour_numero = 0
         self.dernier_total_des = 0
-        self.strategie = strategie or IAAgressive()
+        # Support either a single strategy (applied to all players) or a list of strategies per player
+        if isinstance(strategie, list):
+            # normalize length: repeat last if shorter
+            if len(strategie) < len(self.joueurs):
+                strategie = strategie + [strategie[-1]] * (len(self.joueurs) - len(strategie))
+            self.strategies = strategie[:len(self.joueurs)]
+        else:
+            base = strategie or IAAgressive()
+            self.strategies = [base for _ in self.joueurs]
+
+        # Attach strategy to each Joueur for per-player decisions
+        for idx, j in enumerate(self.joueurs):
+            try:
+                j.strategie = self.strategies[idx]
+            except Exception:
+                j.strategie = self.strategies[0]
         self.stats = StatistiquesPartie()
         self.mode_debug = False
     
@@ -173,8 +190,73 @@ class Monopoly:
         
         if not quartiers:
             return
-        
-        # Construction automatique par l'IA (stratégie simple)
+        # If an IA strategy is set and provides a construction choice, ask it repeatedly
+        # Use the player's own strategy (if present) to decide constructions
+        if getattr(joueur, 'strategie', None) is not None and hasattr(joueur.strategie, 'decider_construction'):
+            # The strategy returns a Propriete to build on (or None). Loop while the IA requests constructions
+            while True:
+                try:
+                    cible = joueur.strategie.decider_construction(joueur)
+                except Exception:
+                    # If the strategy isn't ready to decide, fallback to default behavior
+                    cible = None
+
+                # If strategy returned a property, try to build on it
+                if isinstance(cible, Propriete):
+                    prop = cible
+                    # Ensure still constructible; affordability is checked by construire_* methods
+                    if not prop.peut_construire(joueur):
+                        break
+
+                    # Allow IAStrategique to force construction (bypass repartition rules)
+                    force = isinstance(joueur.strategie, IAStrategique)
+
+                    if prop.nb_maisons < 4:
+                        if prop.construire_maison(joueur, forcer=force):
+                            if not self.mode_debug:
+                                print(f"Construction d'une maison sur {prop.nom}")
+                            # Enregistrer la construction
+                            if hasattr(self, 'stats') and self.stats is not None:
+                                try:
+                                    self.stats.constructions.append({
+                                        'tour': self.tour_numero,
+                                        'joueur': joueur.nom,
+                                        'propriete': prop.nom,
+                                        'type': 'maison',
+                                        'cout': prop.prix_maison
+                                    })
+                                except Exception:
+                                    pass
+                            # continue loop to ask strategy for next build
+                            continue
+                        else:
+                            break
+                    elif prop.nb_maisons == 4:
+                        if prop.construire_hotel(joueur, forcer=force):
+                            if not self.mode_debug:
+                                print(f"Construction d'un hôtel sur {prop.nom}")
+                            # Enregistrer la construction
+                            if hasattr(self, 'stats') and self.stats is not None:
+                                try:
+                                    self.stats.constructions.append({
+                                        'tour': self.tour_numero,
+                                        'joueur': joueur.nom,
+                                        'propriete': prop.nom,
+                                        'type': 'hotel',
+                                        'cout': prop.prix_maison * 5
+                                    })
+                                except Exception:
+                                    pass
+                            continue
+                        else:
+                            break
+                    else:
+                        break
+
+                # If strategy returned True (legacy) or None, fall back to default simple behavior
+                break
+
+        # Fallback/simple automatic construction (kept for non-IA or legacy strategies)
         for couleur, proprietes in quartiers.items():
             for prop in proprietes:
                 if prop.peut_construire(joueur):
@@ -210,7 +292,12 @@ class Monopoly:
             print("DÉBUT DE LA PARTIE DE MONOPOLY")
             print("="*60)
             print(f"Joueurs: {', '.join(j.nom for j in self.joueurs)}")
-            print(f"Stratégie IA: {self.strategie.nom}")
+            # Print per-player strategy summary
+            try:
+                summary = ", ".join(f"{j.nom} -> {getattr(j,'strategie').nom}" for j in self.joueurs)
+                print(f"Stratégies IA par joueur: {summary}")
+            except Exception:
+                pass
             print("="*60)
         
         while not self.partie_terminee() and self.tour_numero < max_tours:
@@ -271,6 +358,10 @@ class Monopoly:
                         elif prop.nb_maisons > 0:
                             info += f" [{prop.nb_maisons}]"
                     print(info)
+            # Constructions réalisées
+            maisons = getattr(gagnant, 'maisons_construites', 0)
+            hotels = getattr(gagnant, 'hotels_construits', 0)
+            print(f"\nConstructions réalisées par {gagnant.nom}: {maisons} maisons, {hotels} hôtels")
         else:
             print(f"Limite de {self.tour_numero} tours atteinte")
             
@@ -282,6 +373,9 @@ class Monopoly:
                 for i, j in enumerate(joueurs_vivants, 1):
                     valeur = j.calculer_valeur_totale()
                     print(f"   {i}. {j.nom}: {j.argent}€ (valeur totale: {valeur}€)")
+                    maisons = getattr(j, 'maisons_construites', 0)
+                    hotels = getattr(j, 'hotels_construits', 0)
+                    print(f"       → Constructions: {maisons} maisons, {hotels} hôtels")
 
 
 

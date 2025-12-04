@@ -12,6 +12,8 @@ class StatistiquesPartie :
     def __init__(self):
         self.passages_par_case: Dict[int, int] = {}
         self.revenus_par_propriete: Dict[str, int] = {}
+        # Journal des constructions: liste de dict {tour, joueur, propriete, type, cout}
+        self.constructions: list[dict] = []
         self.nb_tours = 0
         self.gagnant: Optional[Joueur] = None
     
@@ -59,3 +61,14 @@ class StatistiquesPartie :
                                    key=lambda x: x[1], reverse=True)[:5]
             for nom, revenus in top_proprietes:
                 print(f"   {nom:30}: {revenus:4}€ de loyers")
+
+        # Journal des constructions
+        if self.constructions:
+            print("\nJournal des constructions (chronologique):")
+            for ev in self.constructions:
+                tour = ev.get('tour')
+                joueur = ev.get('joueur')
+                prop = ev.get('propriete')
+                typ = ev.get('type')
+                cout = ev.get('cout')
+                print(f"   [Tour {tour}] {joueur} a construit {typ} sur {prop} (coût: {cout}€)")

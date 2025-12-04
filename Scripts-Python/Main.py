@@ -17,6 +17,46 @@ from IAStrategique import IAStrategique
 from IAConservative import IAConservative
 from Statistiques import StatistiquesPartie
 
+
+def _read_int(prompt: str, min_val: int | None = None, max_val: int | None = None) -> int:
+    """Lit un entier depuis l'entrée utilisateur de manière robuste.
+    Accepte des entrées comme '4.' ou '4.0' et refuse les flottants non entiers.
+    Répète la demande tant que l'entrée n'est pas valide.
+    """
+    while True:
+        s = input(prompt).strip()
+        if s == '':
+            print("Entrée vide — veuillez saisir un nombre.")
+            continue
+        # Accept simple trailing dot (e.g. '4.') by stripping it
+        if s.endswith('.'):
+            s2 = s[:-1]
+        else:
+            s2 = s
+
+        try:
+            val = int(s2)
+        except ValueError:
+            # try float then check it's an integer value
+            try:
+                f = float(s2)
+                if abs(f - round(f)) < 1e-9:
+                    val = int(round(f))
+                else:
+                    print(f"'{s}' n'est pas un entier valide.")
+                    continue
+            except ValueError:
+                print(f"'{s}' n'est pas un entier valide.")
+                continue
+
+        if min_val is not None and val < min_val:
+            print(f"Le nombre doit être au moins {min_val}.")
+            continue
+        if max_val is not None and val > max_val:
+            print(f"Le nombre doit être au plus {max_val}.")
+            continue
+        return val
+
 def simuler_parties(nb_parties: int, nb_joueurs: int, strategie: StrategieIA = None):
     """Simule plusieurs parties et collecte des statistiques agrégées"""
     print(f"\n{'='*60}")
@@ -32,7 +72,7 @@ def simuler_parties(nb_parties: int, nb_joueurs: int, strategie: StrategieIA = N
         if (i + 1) % 10 == 0 or i == 0:
             print(f"Progression: {i+1}/{nb_parties}", end='\r')
         
-        noms = [f"Joueur {j+1}" for j in range(nb_joueurs)]
+        noms = [f"Joueur {j+1} ({strategie.nom})" for j in range(nb_joueurs)]
         jeu = Monopoly(noms, strategie)
         jeu.mode_debug = True
         
@@ -114,14 +154,13 @@ def comparer_strategies(nb_parties: int = 50, nb_joueurs: int = 3):
         print(f"\nTest de la stratégie {strat.nom}...")
         resultats = {f"Joueur {i+1}": 0 for i in range(nb_joueurs)}
         durees = []
-        
         for i in range(nb_parties):
-            noms = [f"Joueur {j+1}" for j in range(nb_joueurs)]
+            noms = [f"Joueur {j+1} ({strat.nom})" for j in range(nb_joueurs)]
             jeu = Monopoly(noms, strategie=strat)
             jeu.mode_debug = True
-            
+
             gagnant = jeu.jouer_partie(max_tours=200)
-            
+
             if gagnant:
                 resultats[gagnant.nom] += 1
             durees.append(jeu.stats.nb_tours)
@@ -210,40 +249,62 @@ def main():
     print("6. Afficher le plateau")
     print("0. Quitter")
     
-    choix = input("\n Votre choix (0-6): ").strip()
+    choix = _read_int("\n Votre choix (0-6): ", min_val=0, max_val=6)
     
-    if choix == "1":
+    if choix == 1:
         print("\n" + "="*60)
-        noms = ["Alain", "Béa", "Charles"]
-        jeu = Monopoly(noms, IAStrategique())
+        # Allow choosing different strategies per player
+        print("Voulez-vous utiliser la même stratégie pour tous les joueurs ? (o/n)")
+        rep = input("Votre choix (o/n): ").strip().lower()
+        available = {
+            '1': IAAgressive(),
+            '2': IAConservative(),
+            '3': IAStrategique()
+        }
+
+        if rep == 'n':
+            strategies = []
+            noms = []
+            for i, base_name in enumerate(["Alain", "Béa", "Charles"]):
+                print(f"Choisissez la stratégie pour {base_name}:")
+                print("  1) Agressive\n  2) Conservative\n  3) Stratégique")
+                choice = input(f"Stratégie pour {base_name} (1-3): ").strip()
+                strat = available.get(choice, IAStrategique())
+                strategies.append(strat)
+                noms.append(f"{base_name} ({strat.nom})")
+            jeu = Monopoly(noms, strategies)
+        else:
+            strat = IAStrategique()
+            noms = [f"{name} ({strat.nom})" for name in ["Alain", "Béa", "Charles"]]
+            jeu = Monopoly(noms, strat)
         jeu.jouer_partie(max_tours=100)
         jeu.stats.afficher_statistiques()
     
-    elif choix == "2":
+    elif choix == 2:
         print("\n" + "="*60)
-        nb = int(input("Nombre de joueurs (2-4): "))
+        nb = _read_int("Nombre de joueurs (2-4): ", min_val=2, max_val=4)
         noms = [input(f"Nom du joueur {i+1}: ") for i in range(nb)]
         jeu = Monopoly(noms, IAStrategique())
         jeu.jouer_partie(max_tours=150, mode_interactif=True)
         jeu.stats.afficher_statistiques()
     
-    elif choix == "3":
+    elif choix == 3:
         print("\n" + "="*60)
-        nb_parties = int(input("Nombre de parties à simuler: "))
-        nb_joueurs = int(input("Nombre de joueurs par partie (2-4): "))
+        nb_parties = _read_int("Nombre de parties à simuler: ", min_val=1)
+        nb_joueurs = _read_int("Nombre de joueurs par partie (2-4): ", min_val=2, max_val=4)
         simuler_parties(nb_parties, nb_joueurs, IAStrategique())
     
-    elif choix == "4":
+    elif choix == 4:
         print("\n" + "="*60)
-        nb_parties = int(input("Nombre de parties par stratégie: "))
-        nb_joueurs = int(input("Nombre de joueurs par partie (2-4): "))
+        nb_parties = _read_int("Nombre de parties par stratégie: ", min_val=1)
+        nb_joueurs = _read_int("Nombre de joueurs par partie (2-4): ", min_val=2, max_val=4)
         comparer_strategies(nb_parties, nb_joueurs)
 
-    elif choix == "5":
+    elif choix == 5:
         print("\n" + "="*60)
         test_complet()
     
-    elif choix == "6":
+    elif choix == 6:
         print("\n" + "="*60)
         plateau = Plateau()
         plateau.afficher_plateau()

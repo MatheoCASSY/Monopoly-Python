@@ -45,7 +45,7 @@ class Propriete(Case):
         return self.loyer_base
     
 
-    def peut_construire(self, joueur: 'Joueur') -> bool:
+    def peut_construire(self, joueur: 'Joueur', ignorer_repartition: bool = False) -> bool:
         """Vérifie si on peut construire sur cette propriété"""
         if self.proprietaire != joueur:
             return False
@@ -70,17 +70,19 @@ class Propriete(Case):
         # si déjà hôtel (5 maisons) -> pas possible
         if self.nb_maisons == 5:
             return False
-        
-        nbMaisonsMin = min([p.nb_maisons for p in joueur.proprietes])
-        if self.nb_maisons > nbMaisonsMin:
-             return False
+
+        # Respecter la répartition équilibrée sauf si on force la construction
+        if not ignorer_repartition:
+            nbMaisonsMin = min([p.nb_maisons for p in joueur.proprietes])
+            if self.nb_maisons > nbMaisonsMin:
+                return False
         
         # ici ok
         return True
     
-    def construire_maison(self, joueur: 'Joueur') -> bool:
+    def construire_maison(self, joueur: 'Joueur', forcer: bool = False) -> bool:
         """Construit une maison (maximum 4)"""
-        if not self.peut_construire(joueur):
+        if not self.peut_construire(joueur, ignorer_repartition=forcer):
             return False
         
         # Autorisé jusqu'à 5 (5 représente l'hôtel)
@@ -92,11 +94,17 @@ class Propriete(Case):
         
         joueur.payer(self.prix_maison)
         self.nb_maisons += 1
+        # Enregistrer la construction sur le joueur
+        try:
+            joueur.maisons_construites += 1
+        except Exception:
+            pass
         return True
     
-    def construire_hotel(self, joueur: 'Joueur') -> bool:
+    def construire_hotel(self, joueur: 'Joueur', forcer: bool = False) -> bool:
         """Construit un hôtel (nécessite 4 maisons)"""
-        if not self.peut_construire(joueur):
+        # Allow forcing via peut_construire's ignorer_repartition if needed
+        if not self.peut_construire(joueur, ignorer_repartition=forcer):
             return False
         if self.nb_maisons != 4:
             return False
@@ -107,6 +115,11 @@ class Propriete(Case):
         # Construire l'hôtel comme la 5ème maison — coût = 5 × prix_maison
         joueur.payer(self.prix_maison * 5)
         self.nb_maisons = 5
+        # Enregistrer l'hôtel construit sur le joueur
+        try:
+            joueur.hotels_construits += 1
+        except Exception:
+            pass
         return True
    
     def action(self, joueur: 'Joueur', jeu: 'Monopoly'):
@@ -114,7 +127,13 @@ class Propriete(Case):
         if self.proprietaire is None:
             # Propriété libre - proposer l'achat
             if joueur.argent >= self.prix:
-                decision = jeu.strategie.decider_achat(joueur, self)
+                # Use the player's strategy if available, otherwise default to buying
+                strat = getattr(joueur, 'strategie', None)
+                if strat is not None and hasattr(strat, 'decider_achat'):
+                    decision = strat.decider_achat(joueur, self)
+                else:
+                    decision = True
+
                 if decision:
                     joueur.acheter_propriete(self)
                     print(f"  → {joueur.nom} achète {self.nom} pour {self.prix}€")

@@ -35,4 +35,52 @@ class IAStrategique(StrategieIA):
         return joueur.argent >= propriete.prix * 3
 
     def decider_construction(self, joueur: 'Joueur') -> Optional[Propriete]:
-        return True
+        """Choisit la meilleure propriété sur laquelle construire.
+
+        Règles :
+        - Ne considère que les quartiers complets détenus par le joueur.
+        - Ne propose que des propriétés constructibles (pas gare/compagnie, pas hypothéquées).
+        - Priorise les propriétés avec le moins de maisons (répartition équilibrée),
+          puis par `prix_maison` décroissant pour maximiser l'impact.
+        - Retourne la `Propriete` choisie ou `None` si aucune construction n'est souhaitable.
+        """
+        # Rassembler les propriétés constructibles dans des quartiers complets
+        candidats: List[Propriete] = []
+        for prop in joueur.proprietes:
+            from Gare import Gare
+            from Compagnie import Compagnie
+
+            if not isinstance(prop, Propriete) or isinstance(prop, (Gare, Compagnie)):
+                continue
+
+            # Vérifier que le joueur possède le quartier complet
+            couleur = prop.quartier.couleur if getattr(prop, 'quartier', None) is not None else prop.couleur
+            possede = False
+            if getattr(prop, 'quartier', None) is not None:
+                possede = prop.quartier.possederQuartier(joueur)
+            else:
+                possede = joueur.possede_quartier_complet(couleur)
+
+            if not possede:
+                continue
+
+            # Exclure propriétés hypothéquées ou déjà à l'hôtel
+            if getattr(prop, 'hypothequee', False):
+                continue
+            if prop.nb_maisons >= 5:
+                continue
+
+            # Vérifier que la propriété permet la construction selon les règles
+            if not prop.peut_construire(joueur):
+                continue
+
+            candidats.append(prop)
+
+        if not candidats:
+            return None
+
+        # Trier: d'abord par nombre de maisons (asc), puis par prix_maison (desc)
+        candidats.sort(key=lambda p: (p.nb_maisons, - (getattr(p, 'prix_maison', 0))))
+
+        # Choisir le meilleur candidat
+        return candidats[0]
