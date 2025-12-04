@@ -73,8 +73,21 @@ class Propriete(Case):
 
         # Respecter la répartition équilibrée sauf si on force la construction
         if not ignorer_repartition:
-            nbMaisonsMin = min([p.nb_maisons for p in joueur.proprietes])
-            if self.nb_maisons > nbMaisonsMin:
+            # Considérer seulement les propriétés du même quartier / couleur
+            try:
+                if self.quartier is not None:
+                    props = [p for p in self.quartier.proprietes if p.proprietaire == joueur]
+                else:
+                    props = [p for p in joueur.proprietes if hasattr(p, 'couleur') and p.couleur == self.couleur]
+
+                if not props:
+                    nbMaisonsMin = 0
+                else:
+                    nbMaisonsMin = min(p.nb_maisons for p in props)
+                if self.nb_maisons > nbMaisonsMin:
+                    return False
+            except Exception:
+                # Fallback conservative behavior: disallow if any inconsistency
                 return False
         
         # ici ok

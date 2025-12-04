@@ -89,7 +89,8 @@ def simuler_parties(nb_parties: int, nb_joueurs: int, strategie: StrategieIA = N
         # Use the same strategies_for_players for every simulated game
         noms = [f"Joueur {j+1} ({strategies_for_players[j].nom})" for j in range(nb_joueurs)]
         jeu = Monopoly(noms, strategies_for_players)
-        jeu.mode_debug = True
+        # Disable verbose debug output for bulk simulations to keep logs readable
+        jeu.mode_debug = False
         
         gagnant = jeu.jouer_partie(max_tours=200)
         # increment results by player index so aggregation is stable
@@ -99,6 +100,31 @@ def simuler_parties(nb_parties: int, nb_joueurs: int, strategie: StrategieIA = N
                     resultats[f"Joueur {idx+1}"] += 1
                     break
         durees.append(jeu.stats.nb_tours)
+        # Record per-player construction counters into the stats object so
+        # aggregated simulation reporting can compute averages.
+        try:
+            jeu.stats.maisons_par_joueur = [j.maisons_construites for j in jeu.joueurs]
+            jeu.stats.hotels_par_joueur = [j.hotels_construits for j in jeu.joueurs]
+        except Exception:
+            # If counters are missing for any reason, fallback to zeros
+            jeu.stats.maisons_par_joueur = [0 for _ in range(nb_joueurs)]
+            jeu.stats.hotels_par_joueur = [0 for _ in range(nb_joueurs)]
+        # Count complete quartiers owned per player (useful to debug construction opportunities)
+        try:
+            quartiers_counts = []
+            for j in jeu.joueurs:
+                cnt = 0
+                try:
+                    for q in jeu.plateau.quartiers.values():
+                        if q.possederQuartier(j):
+                            cnt += 1
+                except Exception:
+                    cnt = 0
+                quartiers_counts.append(cnt)
+            jeu.stats.quartiers_complets_par_joueur = quartiers_counts
+        except Exception:
+            jeu.stats.quartiers_complets_par_joueur = [0 for _ in range(nb_joueurs)]
+
         toutes_stats.append(jeu.stats)
     
     print()  # Nouvelle ligne après la progression
@@ -176,6 +202,57 @@ def _afficher_resultats_simulation(resultats: dict, durees: List[int],
         for nom, rev in top_props:
             moyenne = rev / nb_parties
             print(f"  {nom:30}: {moyenne:6.0f}€/partie")
+
+    # Moyenne des maisons achetées par joueur (agrégé sur toutes les parties)
+    try:
+        nb_joueurs = len(strategies)
+        maisons_totales_par_joueur = [0] * nb_joueurs
+        hotels_totales_par_joueur = [0] * nb_joueurs
+        for stats in toutes_stats:
+            mpj = getattr(stats, 'maisons_par_joueur', None)
+            hpj = getattr(stats, 'hotels_par_joueur', None)
+            if mpj and len(mpj) >= nb_joueurs:
+                for i in range(nb_joueurs):
+                    maisons_totales_par_joueur[i] += mpj[i]
+            else:
+                # If missing, try to infer (0)
+                pass
+            if hpj and len(hpj) >= nb_joueurs:
+                for i in range(nb_joueurs):
+                    hotels_totales_par_joueur[i] += hpj[i]
+
+        print(f"\nMoyenne des constructions par joueur (maisons / hôtels) :")
+        for i in range(nb_joueurs):
+            moy_maisons = maisons_totales_par_joueur[i] / nb_parties
+            moy_hotels = hotels_totales_par_joueur[i] / nb_parties
+            try:
+                strat_label = strategies[i].nom
+                label = f"Joueur {i+1} ({strat_label})"
+            except Exception:
+                label = f"Joueur {i+1}"
+            print(f"  {label:28}: {moy_maisons:4.2f} maisons / {moy_hotels:4.2f} hôtels (moy.)")
+    except Exception:
+        # Silently ignore if computation fails
+        pass
+
+    # Afficher la moyenne du nombre de quartiers complets possédés par joueur (debug)
+    try:
+        quartiers_totaux = [0] * len(strategies)
+        for stats in toutes_stats:
+            qpj = getattr(stats, 'quartiers_complets_par_joueur', None)
+            if qpj and len(qpj) >= len(strategies):
+                for i in range(len(strategies)):
+                    quartiers_totaux[i] += qpj[i]
+        print(f"\nMoyenne des quartiers complets possédés par joueur :")
+        for i in range(len(strategies)):
+            moy = quartiers_totaux[i] / nb_parties
+            try:
+                label = f"Joueur {i+1} ({strategies[i].nom})"
+            except Exception:
+                label = f"Joueur {i+1}"
+            print(f"  {label:28}: {moy:.2f} quartiers (moy.)")
+    except Exception:
+        pass
 
 
 def comparer_strategies(nb_parties: int = 50, nb_joueurs: int = 3):
