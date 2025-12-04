@@ -14,11 +14,13 @@ from Global import TypeCase
 from typing import List, Optional
 
 from db import DB
+from Quartier import Quartier
 
 class Plateau:
     """Représente le plateau de jeu Monopoly"""
     def __init__(self):
         self.cases: List['Case'] = [] # type: ignore
+        self.quartiers: dict = {}
         self._creer_plateau()
     
     def _creer_plateau(self):
@@ -28,6 +30,24 @@ class Plateau:
        
         for p in DB.get_proprietes():
             self.cases.append(p)
+
+        # Construire les objets Quartier et affecter les propriétés
+        quartiers: dict[str, Quartier] = {}
+        # Regrouper uniquement les propriétés (ignore gares/compagnies)
+        proprietes = [c for c in self.cases if isinstance(c, Propriete)]
+        for prop in proprietes:
+            couleur = prop.couleur
+            if couleur in [None, "gare", "compagnie"]:
+                continue
+            if couleur not in quartiers:
+                # prendre le prix_maison depuis la première propriété
+                quartiers[couleur] = Quartier(couleur, prop.prix_maison)
+            quartiers[couleur].ajouter_propriete(prop)
+            # affecter la référence au quartier sur la propriété
+            prop.quartier = quartiers[couleur]
+
+        # Exposer le mapping couleur -> Quartier sur l'instance Plateau
+        self.quartiers = quartiers
 
        # Position 0: Départ
         self.cases.append(CaseSpeciale("Départ", 0, TypeCase.DEPART, 200))

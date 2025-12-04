@@ -5,6 +5,7 @@ Durée: 16h sur 4 séances de 4h
 from Case import Case
 
 from typing import Optional
+from Quartier import Quartier
 
 class Propriete(Case):
     """Case représentant une propriété achetable"""
@@ -16,6 +17,8 @@ class Propriete(Case):
         self.proprietaire: Optional['Joueur'] = None # type: ignore
         # nb_maisons: 0-4 = maisons, 5 = hôtel
         self.nb_maisons = 0
+        # Référence au quartier (sera assignée par Plateau)
+        self.quartier: Optional[Quartier] = None
         self.prix_maison = prix_maison
         self.hypothequee = False
     
@@ -31,11 +34,15 @@ class Propriete(Case):
             # Multiplicateurs: 1 maison=×5, 2=×15, 3=×45, 4=×80
             multiplicateurs = [5, 15, 45, 80]
             return self.loyer_base * multiplicateurs[self.nb_maisons - 1]
-        elif self.proprietaire.possede_quartier_complet(self.couleur):
-            # Quartier sans construction = loyer double
-            return self.loyer_base * 2
         else:
-            return self.loyer_base
+            # Si le quartier est connu, interroger l'objet Quartier
+            if self.quartier is not None:
+                if self.quartier.possederQuartier(self.proprietaire):
+                    return self.loyer_base * 2
+            elif self.proprietaire and self.proprietaire.possede_quartier_complet(self.couleur):
+                # fallback sur l'ancien mécanisme
+                return self.loyer_base * 2
+        return self.loyer_base
     
 
     def peut_construire(self, joueur: 'Joueur') -> bool:
@@ -49,8 +56,13 @@ class Propriete(Case):
         if joueur.argent < self.prix_maison:
             return False
         
-        if not joueur.possede_quartier_complet(self.couleur):
-            return False
+        # Vérifier via l'objet Quartier si disponible
+        if self.quartier is not None:
+            if not self.quartier.possederQuartier(joueur):
+                return False
+        else:
+            if not joueur.possede_quartier_complet(self.couleur):
+                return False
           
         if self.hypothequee:
             return False

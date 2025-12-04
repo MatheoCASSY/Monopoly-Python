@@ -153,12 +153,20 @@ class Monopoly:
     
     def _proposer_constructions(self, joueur: Joueur):
         """Propose au joueur de construire sur ses quartiers"""
-        # Trouver les quartiers
+        # Trouver les quartiers (regroupement par objet Quartier si présent)
         quartiers = {}
         for prop in joueur.proprietes:
             if isinstance(prop, Propriete) and not isinstance(prop, (Gare, Compagnie)):
-                couleur = prop.couleur
-                if joueur.possede_quartier_complet(couleur):
+                # Si la propriété a un objet Quartier, utiliser sa couleur comme clé
+                couleur = prop.quartier.couleur if getattr(prop, 'quartier', None) is not None else prop.couleur
+                # Vérifier que le joueur possède tout le quartier
+                possede = False
+                if getattr(prop, 'quartier', None) is not None:
+                    possede = prop.quartier.possederQuartier(joueur)
+                else:
+                    possede = joueur.possede_quartier_complet(couleur)
+
+                if possede:
                     if couleur not in quartiers:
                         quartiers[couleur] = []
                     quartiers[couleur].append(prop)

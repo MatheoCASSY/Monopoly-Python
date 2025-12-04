@@ -19,11 +19,14 @@ class IAStrategique(StrategieIA):
         # Ne pas dépenser si trop peu d'argent
         if joueur.argent < propriete.prix * 1.5:
             return False
-        
-        # Compter combien de propriétés de cette couleur sont déjà possédées
-        nb_possede = sum(1 for p in joueur.proprietes 
-                        if hasattr(p, 'couleur') and p.couleur == propriete.couleur)
-        
+        # Si la propriété appartient à un objet Quartier, compter les propriétés du quartier possédées
+        nb_possede = 0
+        if getattr(propriete, 'quartier', None) is not None:
+            nb_possede = sum(1 for p in propriete.quartier.proprietes if p.proprietaire == joueur)
+        else:
+            # fallback : compter par couleur
+            nb_possede = sum(1 for p in joueur.proprietes if hasattr(p, 'couleur') and p.couleur == propriete.couleur)
+
         # Haute priorité si ça rapproche d'un quartier
         if nb_possede >= 1:
             return True
